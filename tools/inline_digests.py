@@ -1,10 +1,11 @@
 """Write each Android toolchain download's SHA-256 and size next to its SHA-1.
 
-usage: inline_digests.py PRELUDE_DIR DIGESTS_BZL [--fetch]
+usage: inline_digests.py PRELUDE_DIR [DIGESTS_BZL] [--fetch]
 
-DIGESTS_BZL is amux's table (sha1 -> (sha256, size) | None). A declaration
-whose SHA-1 is missing from it is fetched (with --fetch) and checked against
-its SHA-1; without --fetch it is an error.
+A declaration that already has a SHA-256 is left as it is, so after a rebase
+only jars the release added need one. DIGESTS_BZL, optional, is a table of
+SHA-1 to (sha256, size) or None. A declaration found in neither is fetched
+(with --fetch) and checked against its SHA-1; without --fetch it is an error.
 """
 
 import hashlib
@@ -53,9 +54,13 @@ def fetch(sha1, url):
 
 
 def main():
-    prelude, table = Path(sys.argv[1]), Path(sys.argv[2])
+    args = [a for a in sys.argv[1:] if a != "--fetch"]
     allow_fetch = "--fetch" in sys.argv
-    digests = {s1: (s256, int(n)) if s256 else None for s1, s256, n in ENTRY.findall(table.read_text())}
+    prelude = Path(args[0])
+    table = args[1] if len(args) > 1 else None
+    digests = {}
+    if table:
+        digests = {s1: (s256, int(n)) if s256 else None for s1, s256, n in ENTRY.findall(Path(table).read_text())}
     done = skipped = 0
     for path in sorted(p for p in (prelude / "toolchains/android").rglob("BUCK") if p.is_file()):
         text = path.read_text()
